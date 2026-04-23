@@ -41,6 +41,7 @@ APP_NAME="Gradle"
 APP_BASE_NAME=${0##*/}
 
 # Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
+# DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"' # REMOVED to fix JVM argument parsing issue
 
 # Use the maximum available, or set MAX_FD != -1 to use that value.
 MAX_FD=maximum
@@ -108,6 +109,7 @@ fi
 #   * -classpath
 #   * -D...appname settings
 #   * --module-path (only if needed)
+#   * DEFAULT_JVM_OPTS, JAVA_OPTS, and GRADLE_OPTS environment variables.
 
 # For Cygwin or MSYS, switch paths to Windows format before running java
 if "$cygwin" || "$msys" ; then
