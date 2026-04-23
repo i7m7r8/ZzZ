@@ -148,12 +148,19 @@ jobs:
           }
 
           # 1. Download Tor
-          # Using Tor Project's expert bundle for Android aarch64
+          # Using Tor Project's expert bundle for Android aarch64 (verified URL)
           TOR_VER="15.0.10" # Latest stable
-          TOR_URL="https://dist.torproject.org/torbrowser/${TOR_VER}/tor-expert-bundle-${TOR_VER}-android-${ARCH}.tar.gz"
-          if ! download_and_extract "$TOR_URL" "/tmp/tor.tar.gz" "/tmp/tor_out" "tor" "libtor.so"; then
-             echo "Using stub for Tor"
-             printf '\x7fELF' > app/src/main/jniLibs/$ABI/libtor.so
+          # Check if ARCH is aarch64 for the tar.gz URL, otherwise use stub
+          if [ "$ARCH" = "aarch64" ]; then
+            TOR_URL="https://dist.torproject.org/torbrowser/${TOR_VER}/tor-expert-bundle-${TOR_VER}-android-${ARCH}.tar.gz"
+            if ! download_and_extract "$TOR_URL" "/tmp/tor.tar.gz" "/tmp/tor_out" "tor" "libtor.so"; then
+               echo "WARNING: Tor expert bundle download failed. Using stub for Tor."
+               printf '\x7fELF' > app/src/main/jniLibs/$ABI/libtor.so
+            fi
+          else
+            # Fallback for other architectures if needed, or use stub
+            echo "WARNING: Tor expert bundle not available for architecture $ARCH. Using stub for Tor."
+            printf '\x7fELF' > app/src/main/jniLibs/$ABI/libtor.so
           fi
 
           # 2. Download i2pd
@@ -229,15 +236,15 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build debug APK
-        env: # Explicitly set JAVA_OPTS to override potential issues
+        env: # Explicitly set JAVA_OPTS and GRADLE_OPTS to override potential issues
           JAVA_OPTS: "-Xmx1024m -Xms1024m"
-          GRADLE_OPTS: "-Xmx1024m -Xms1024m" # Also set GRADLE_OPTS for broader coverage
+          GRADLE_OPTS: "-Xmx1024m -Xms1024m"
         run: ./gradlew assembleDebug --stacktrace
 
       - name: Build release APK
-        env: # Explicitly set JAVA_OPTS to override potential issues
+        env: # Explicitly set JAVA_OPTS and GRADLE_OPTS to override potential issues
           JAVA_OPTS: "-Xmx1024m -Xms1024m"
-          GRADLE_OPTS: "-Xmx1024m -Xms1024m" # Also set GRADLE_OPTS for broader coverage
+          GRADLE_OPTS: "-Xmx1024m -Xms1024m"
         run: ./gradlew assembleRelease --stacktrace
 
       - name: Upload debug APK
