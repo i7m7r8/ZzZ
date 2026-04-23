@@ -1,0 +1,32 @@
+name: Bootstrap Gradle Wrapper
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Generate gradle wrapper
+        run: |
+          # Install gradle and generate wrapper
+          wget -q https://services.gradle.org/distributions/gradle-8.4-bin.zip -O /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /tmp/
+          /tmp/gradle-8.4/bin/gradle wrapper --gradle-version 8.4 --distribution-type bin
+          ls -la gradle/wrapper/
+
+      - name: Commit wrapper jar
+        run: |
+          git config user.email "github-actions@github.com"
+          git config user.name "GitHub Actions"
+          git add gradle/wrapper/gradle-wrapper.jar gradlew gradlew.bat
+          git commit -m "Add gradle wrapper jar [skip ci]" || echo "Nothing to commit"
+          git push

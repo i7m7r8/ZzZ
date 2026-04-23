@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ZzZ VPN</string>
+    <string name="vpn_service_name">ZzZ VPN Service</string>
+    <string name="notification_channel_vpn">VPN Status</string>
+    <string name="notification_channel_tor">Tor Service</string>
+    <string name="notification_channel_i2p">I2P Service</string>
+    <string name="notification_channel_dns">DNSCrypt Service</string>
+</resources>
