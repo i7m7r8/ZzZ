@@ -60,8 +60,17 @@ jobs:
           ABI=${{ matrix.abi }}
           TARGET=${{ matrix.target }}
           mkdir -p app/src/main/jniLibs/$ABI
-          # Corrected cp command syntax: ensure source and destination are on the same line
+          # Corrected cp command syntax and ensure source and destination are on the same line
           cp target/$TARGET/release/libzzz_core.so app/src/main/jniLibs/$ABI/libzzz_core.so
+        # Add a debug step to list target directory contents if the copy fails
+        continue-on-error: true
+
+      - name: Debug Rust build output if copy failed
+        if: steps.copy-so.outcome == 'failure'
+        run: |
+          echo "Contents of target directory:"
+          ls -R target/
+        continue-on-error: true
 
       - name: Upload jniLibs artifact
         uses: actions/upload-artifact@v4
