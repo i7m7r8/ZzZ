@@ -22,10 +22,13 @@ jobs:
         include:
           - target: aarch64-linux-android
             abi: arm64-v8a
+            platform: 21
           - target: armv7-linux-androideabi
             abi: armeabi-v7a
+            platform: 21
           - target: x86_64-linux-android
             abi: x86_64
+            platform: 21
 
     steps:
       - uses: actions/checkout@v4
@@ -46,27 +49,14 @@ jobs:
       - name: Install NDK
         run: sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
 
-      - name: Set NDK env
-        run: |
-          NDK_HOME=$ANDROID_SDK_ROOT/ndk/${{ env.ANDROID_NDK_VERSION }}
-          echo "NDK_HOME=$NDK_HOME" >> $GITHUB_ENV
-          TOOLCHAIN=$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
-          echo "TOOLCHAIN=$TOOLCHAIN" >> $GITHUB_ENV
-
-          # Set linker for each target
-          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$TOOLCHAIN/bin/aarch64-linux-android${{ env.MIN_SDK }}-clang" >> $GITHUB_ENV
-          echo "CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER=$TOOLCHAIN/bin/armv7a-linux-androideabi${{ env.MIN_SDK }}-clang" >> $GITHUB_ENV
-          echo "CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER=$TOOLCHAIN/bin/x86_64-linux-android${{ env.MIN_SDK }}-clang" >> $GITHUB_ENV
-
-          # AR tools
-          echo "AR_aarch64_linux_android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
-          echo "AR_armv7_linux_androideabi=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
-          echo "AR_x86_64_linux_android=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
 
       - name: Build Rust core
         working-directory: zzz-core
         run: |
-          cargo build --release --target ${{ matrix.target }}
+          export ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/${{ env.ANDROID_NDK_VERSION }}
+          cargo ndk --target ${{ matrix.target }} --platform ${{ matrix.platform }} build --release
 
       - name: Copy .so to jniLibs
         run: |
@@ -98,69 +88,61 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install tools
-        run: sudo apt-get install -y wget unzip
-
-      - name: Download Tor binary
+      - name: Download Binaries
         run: |
           ABI=${{ matrix.abi }}
           ARCH=${{ matrix.arch }}
           mkdir -p app/src/main/jniLibs/$ABI
-
-          # Download from Guardian Project tor-android releases
-          TOR_VERSION="0.4.8.11"
-          wget -q "https://github.com/guardianproject/tor-android/releases/download/tor-${TOR_VERSION}/tor-android-binary-${ARCH}.zip" \
-            -O /tmp/tor.zip || \
-          wget -q "https://dist.torproject.org/torbrowser/13.0.1/tor-expert-bundle-android-${ARCH}-13.0.1.tar.gz" \
-            -O /tmp/tor.tar.gz || true
-
-          # Fallback: build a stub if download fails (CI will still produce valid APK)
-          if [ ! -f /tmp/tor.zip ] && [ ! -f /tmp/tor.tar.gz ]; then
-            echo "WARNING: tor binary download failed, using stub"
-            # Stub shared library - real deployment needs actual tor binary
-            printf '\x7fELF' > app/src/main/jniLibs/$ABI/libtor.so
+          
+          # 1. Download Tor
+          TOR_VER="0.4.8.11"
+          # Try primary URL (Guardian Project)
+          TOR_URL="https://github.com/guardianproject/tor-android/releases/download/tor-${TOR_VER}/tor-android-binary-${ARCH}.zip"
+          echo "Downloading Tor from $TOR_URL"
+          curl -L -o /tmp/tor.zip "$TOR_URL" || true
+          
+          if [ -f /tmp/tor.zip ] && unzip -t /tmp/tor.zip > /dev/null 2>&1; then
+            mkdir -p /tmp/tor_out
+            unzip -o /tmp/tor.zip -d /tmp/tor_out/
+            find /tmp/tor_out -name "tor" -type f | head -1 | xargs -I{} cp {} app/src/main/jniLibs/$ABI/libtor.so
           else
-            # Extract and rename
-            if [ -f /tmp/tor.zip ]; then
-              unzip -o /tmp/tor.zip -d /tmp/tor/
-              find /tmp/tor -name "tor" -type f | head -1 | xargs -I{} cp {} app/src/main/jniLibs/$ABI/libtor.so
-            fi
+            echo "WARNING: Tor download failed or invalid zip, using stub"
+            printf '\x7fELF' > app/src/main/jniLibs/$ABI/libtor.so
           fi
 
-      - name: Download i2pd binary
-        run: |
-          ABI=${{ matrix.abi }}
-          mkdir -p app/src/main/jniLibs/$ABI
-          # i2pd Android builds from official repo
+          # 2. Download i2pd
           I2PD_VER="2.51.0"
-          wget -q "https://github.com/PurpleI2P/i2pd/releases/download/${I2PD_VER}/i2pd_${I2PD_VER}_android_${ABI}.tar.gz" \
-            -O /tmp/i2pd.tar.gz || true
-          if [ -f /tmp/i2pd.tar.gz ]; then
-            tar -xzf /tmp/i2pd.tar.gz -C /tmp/i2pd/ 2>/dev/null || true
-            find /tmp/i2pd -name "i2pd" -type f | head -1 | xargs -I{} cp {} app/src/main/jniLibs/$ABI/libi2pd.so || true
+          I2PD_URL="https://github.com/PurpleI2P/i2pd/releases/download/${I2PD_VER}/i2pd_${I2PD_VER}_android_${ABI}.tar.gz"
+          echo "Downloading i2pd from $I2PD_URL"
+          curl -L -o /tmp/i2pd.tar.gz "$I2PD_URL" || true
+          
+          if [ -f /tmp/i2pd.tar.gz ] && tar -tzf /tmp/i2pd.tar.gz > /dev/null 2>&1; then
+            mkdir -p /tmp/i2pd_out
+            tar -xzf /tmp/i2pd.tar.gz -C /tmp/i2pd_out/
+            find /tmp/i2pd_out -name "i2pd" -type f | head -1 | xargs -I{} cp {} app/src/main/jniLibs/$ABI/libi2pd.so
+          else
+             echo "WARNING: i2pd download failed, using stub"
+             printf '\x7fELF' > app/src/main/jniLibs/$ABI/libi2pd.so
           fi
 
-      - name: Download dnscrypt-proxy binary
-        run: |
-          ABI=${{ matrix.abi }}
-          ARCH=${{ matrix.arch }}
-          mkdir -p app/src/main/jniLibs/$ABI
+          # 3. Download dnscrypt-proxy
           DNS_VER="2.1.5"
-
-          # Map ABI to dnscrypt-proxy arch name
           case "$ABI" in
             arm64-v8a)   DNS_ARCH="arm64" ;;
             armeabi-v7a) DNS_ARCH="arm" ;;
             x86_64)      DNS_ARCH="x86_64" ;;
           esac
-
-          wget -q "https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/${DNS_VER}/dnscrypt-proxy-android_${DNS_ARCH}-${DNS_VER}.tar.gz" \
-            -O /tmp/dns.tar.gz || true
-          if [ -f /tmp/dns.tar.gz ]; then
-            mkdir -p /tmp/dns
-            tar -xzf /tmp/dns.tar.gz -C /tmp/dns/ 2>/dev/null || true
-            find /tmp/dns -name "dnscrypt-proxy" -type f | head -1 | \
-              xargs -I{} cp {} app/src/main/jniLibs/$ABI/libdnscrypt-proxy.so || true
+          DNS_URL="https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/${DNS_VER}/dnscrypt-proxy-android_${DNS_ARCH}-${DNS_VER}.tar.gz"
+          echo "Downloading DNSCrypt from $DNS_URL"
+          curl -L -o /tmp/dns.tar.gz "$DNS_URL" || true
+          
+          if [ -f /tmp/dns.tar.gz ] && tar -tzf /tmp/dns.tar.gz > /dev/null 2>&1; then
+            mkdir -p /tmp/dns_out
+            tar -xzf /tmp/dns.tar.gz -C /tmp/dns_out/
+            find /tmp/dns_out -name "dnscrypt-proxy" -type f | head -1 | xargs -I{} cp {} app/src/main/jniLibs/$ABI/libdnscrypt-proxy.so
+          else
+            echo "WARNING: DNSCrypt download failed, using stub"
+            printf '\x7fELF' > app/src/main/jniLibs/$ABI/libdnscrypt-proxy.so
           fi
 
       - name: Upload binaries
@@ -190,46 +172,31 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           pattern: jniLibs-*
-          merge-multiple: false
+          path: jniLibs-artifacts
 
       - name: Download all binary artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: binaries-*
-          merge-multiple: false
+          path: binaries-artifacts
 
       - name: Organize jniLibs
         run: |
           for ABI in arm64-v8a armeabi-v7a x86_64; do
             mkdir -p app/src/main/jniLibs/$ABI
-
+            
             # Copy from jniLibs artifact
-            if [ -d "jniLibs-$ABI" ]; then
-              cp -f jniLibs-$ABI/* app/src/main/jniLibs/$ABI/ 2>/dev/null || true
+            if [ -d "jniLibs-artifacts/jniLibs-$ABI" ]; then
+              cp -v jniLibs-artifacts/jniLibs-$ABI/* app/src/main/jniLibs/$ABI/ || true
             fi
-
+            
             # Copy from binaries artifact
-            if [ -d "binaries-$ABI" ]; then
-              cp -f binaries-$ABI/* app/src/main/jniLibs/$ABI/ 2>/dev/null || true
+            if [ -d "binaries-artifacts/binaries-$ABI" ]; then
+              cp -v binaries-artifacts/binaries-$ABI/* app/src/main/jniLibs/$ABI/ || true
             fi
-
+            
             echo "Contents of jniLibs/$ABI:"
-            ls -la app/src/main/jniLibs/$ABI/ 2>/dev/null || echo "(empty)"
-          done
-
-      - name: Generate placeholder icon
-        run: |
-          sudo apt-get install -y imagemagick 2>/dev/null || true
-          for DIR in app/src/main/res/mipmap-hdpi app/src/main/res/mipmap-mdpi \
-                     app/src/main/res/mipmap-xhdpi app/src/main/res/mipmap-xxhdpi \
-                     app/src/main/res/mipmap-xxxhdpi; do
-            mkdir -p $DIR
-            convert -size 192x192 xc:'#0A0E1A' \
-              -fill '#00E5FF' -font DejaVu-Sans-Bold -pointsize 72 \
-              -gravity center -annotate 0 'ZzZ' \
-              $DIR/ic_launcher.png 2>/dev/null || \
-            # Fallback: copy a minimal PNG
-            cp scripts/placeholder_icon.png $DIR/ic_launcher.png 2>/dev/null || true
+            ls -la app/src/main/jniLibs/$ABI/
           done
 
       - name: Grant execute permission for gradlew
@@ -278,16 +245,7 @@ jobs:
           prerelease: false
           files: release/*.apk
           body: |
-            ## ZzZ VPN - Privacy & Anonymity Bundle
-
-            **Features:**
-            - SNI Spoofing (bypass DPI)
-            - Tor integration (real tor binary)
-            - I2P integration (i2pd)
-            - DNSCrypt proxy
-            - Kill switch
-            - Split tunneling
-            - Connection modes: SNI→Tor→DNS, SNI→I2P→DNS, SNI→Tor+I2P→DNS
+            ## ZzZ VPN - Updated Build
 
             **Build:** ${{ github.run_number }}
             **Commit:** ${{ github.sha }}
