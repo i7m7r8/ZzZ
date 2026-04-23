@@ -65,7 +65,7 @@ jobs:
           # This step might need adjustment if the actual build output isn't easily captured.
           # For now, we assume any error in the previous step would be logged.
           # If build fails, we might want to list the target dir.
-        continue-on-error: true
+        continue-oṇ-error: true
 
       - name: Copy .so to jniLibs
         id: copy-so # Add an ID to reference this step's outcome
@@ -159,12 +159,12 @@ jobs:
             fi
           }
 
-          # 1. Download Tor (using AAR from Guardian Project Maven repo)
+          # 1. Download Tor (using Tor Expert Bundle)
           TOR_LIB_NAME="libtor.so"
-          TOR_VERSION="0.4.8.17.2" # Latest tested version from search results
-          TOR_AAR_URL="https://raw.githubusercontent.com/guardianproject/gpmaven/master/info/guardianproject/tor-android/${TOR_VERSION}/tor-android-${TOR_VERSION}.aar"
-          if ! download_and_extract "$TOR_AAR_URL" "/tmp/tor.aar" "/tmp/tor_out" "tor" "$TOR_LIB_NAME"; then
-             echo "WARNING: Tor AAR download failed. Using stub for Tor."
+          TOR_VER="15.0.10" # Verified stable version
+          TOR_URL="https://archive.torproject.org/tor-package-archive/torbrowser/${TOR_VER}/tor-expert-bundle-${TOR_VER}-android-${ARCH}.tar.gz"
+          if ! download_and_extract "$TOR_URL" "/tmp/tor.tar.gz" "/tmp/tor_out" "tor" "$TOR_LIB_NAME"; then
+             echo "WARNING: Tor expert bundle download failed. Using stub for Tor."
              printf '\x7fELF' > app/src/main/jniLibs/$ABI/$TOR_LIB_NAME
           fi
 
