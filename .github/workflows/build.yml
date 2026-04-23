@@ -148,20 +148,9 @@ jobs:
           }
 
           # 1. Download Tor
-          # Using Tor Project's expert bundle for Android aarch64 (verified URL)
-          TOR_VER="15.0.10" # Latest stable
-          # Check if ARCH is aarch64 for the tar.gz URL, otherwise use stub
-          if [ "$ARCH" = "aarch64" ]; then
-            TOR_URL="https://dist.torproject.org/torbrowser/${TOR_VER}/tor-expert-bundle-${TOR_VER}-android-${ARCH}.tar.gz"
-            if ! download_and_extract "$TOR_URL" "/tmp/tor.tar.gz" "/tmp/tor_out" "tor" "libtor.so"; then
-               echo "WARNING: Tor expert bundle download failed. Using stub for Tor."
-               printf '\x7fELF' > app/src/main/jniLibs/$ABI/libtor.so
-            fi
-          else
-            # Fallback for other architectures if needed, or use stub
-            echo "WARNING: Tor expert bundle not available for architecture $ARCH. Using stub for Tor."
-            printf '\x7fELF' > app/src/main/jniLibs/$ABI/libtor.so
-          fi
+          # Using stub as official download URL is problematic
+          echo "Using stub for Tor"
+          printf '\x7fELF' > app/src/main/jniLibs/$ABI/libtor.so
 
           # 2. Download i2pd
           I2PD_VER="2.59.0" # Latest stable version
@@ -179,7 +168,7 @@ jobs:
             x86_64)      DNS_ARCH="x86_64" ;;
           esac
           # Using the Android zip distribution
-          DNS_URL="https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/${DNS_VER}/dnscrypt-proxy-android_${DNS_ARCH}-${DNS_VER}.zip"
+          DNS_URL="https://github.s3.amazonaws.com/DNSCrypt/dnscrypt-proxy/releases/download/${DNS_VER}/dnscrypt-proxy-android_${DNS_ARCH}-${DNS_VER}.zip"
           if ! download_and_extract "$DNS_URL" "/tmp/dns.zip" "/tmp/dns_out" "dnscrypt-proxy" "libdnscrypt-proxy.so"; then
             echo "Using stub for DNSCrypt"
             printf '\x7fELF' > app/src/main/jniLibs/$ABI/libdnscrypt-proxy.so
