@@ -148,7 +148,7 @@ jobs:
           }
 
           # 1. Download Tor
-          # Using stub as official download URL is problematic
+          # Using stub for Tor as official download URL is problematic
           echo "Using stub for Tor"
           printf '\x7fELF' > app/src/main/jniLibs/$ABI/libtor.so
 
@@ -168,7 +168,7 @@ jobs:
             x86_64)      DNS_ARCH="x86_64" ;;
           esac
           # Using the Android zip distribution
-          DNS_URL="https://github.s3.amazonaws.com/DNSCrypt/dnscrypt-proxy/releases/download/${DNS_VER}/dnscrypt-proxy-android_${DNS_ARCH}-${DNS_VER}.zip"
+          DNS_URL="https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/${DNS_VER}/dnscrypt-proxy-android_${DNS_ARCH}-${DNS_VER}.zip"
           if ! download_and_extract "$DNS_URL" "/tmp/dns.zip" "/tmp/dns_out" "dnscrypt-proxy" "libdnscrypt-proxy.so"; then
             echo "Using stub for DNSCrypt"
             printf '\x7fELF' > app/src/main/jniLibs/$ABI/libdnscrypt-proxy.so
