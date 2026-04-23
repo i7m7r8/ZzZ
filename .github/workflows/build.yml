@@ -56,7 +56,8 @@ jobs:
           echo "Building Rust core for target ${{ matrix.target }}..."
           cargo ndk --target ${{ matrix.target }} --platform ${{ matrix.platform }} build --release -p zzz-core
           echo "Rust build completed."
-        # Add a step to capture and display Rust build output if it fails or has warnings
+        id: build-rust # Add ID for 'steps.build-rust.outcome'
+
       - name: Capture Rust build output
         if: steps.build-rust.outcome == 'failure' || steps.build-rust.outcome == 'success' # Always capture if build happens
         run: |
