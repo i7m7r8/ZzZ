@@ -159,9 +159,14 @@ jobs:
             fi
           }
 
-          # 1. Download Tor (using stub as official download URL is problematic)
-          echo "Using stub for Tor"
-          printf '\x7fELF' > app/src/main/jniLibs/$ABI/libtor.so
+          # 1. Download Tor (using AAR from Guardian Project Maven repo)
+          TOR_LIB_NAME="libtor.so"
+          TOR_VERSION="0.4.8.17.2" # Latest tested version from search results
+          TOR_AAR_URL="https://raw.githubusercontent.com/guardianproject/gpmaven/master/info/guardianproject/tor-android/${TOR_VERSION}/tor-android-${TOR_VERSION}.aar"
+          if ! download_and_extract "$TOR_AAR_URL" "/tmp/tor.aar" "/tmp/tor_out" "tor" "$TOR_LIB_NAME"; then
+             echo "WARNING: Tor AAR download failed. Using stub for Tor."
+             printf '\x7fELF' > app/src/main/jniLibs/$ABI/$TOR_LIB_NAME
+          fi
 
           # 2. Download i2pd
           I2PD_VER="2.59.0" # Latest stable version
@@ -179,7 +184,7 @@ jobs:
             x86_64)      DNS_ARCH="x86_64" ;;
           esac
           # Using the Android zip distribution
-          DNS_URL="https://github.Hacks.com/DNSCrypt/dnscrypt-proxy/releases/download/${DNS_VER}/dnscrypt-proxy-android_${DNS_ARCH}-${DNS_VER}.zip"
+          DNS_URL="https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/${DNS_VER}/dnscrypt-proxy-android_${DNS_ARCH}-${DNS_VER}.zip"
           if ! download_and_extract "$DNS_URL" "/tmp/dns.zip" "/tmp/dns_out" "dnscrypt-proxy" "libdnscrypt-proxy.so"; then
             echo "Using stub for DNSCrypt"
             printf '\x7fELF' > app/src/main/jniLibs/$ABI/libdnscrypt-proxy.so
