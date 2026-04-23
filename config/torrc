@@ -1,0 +1,6 @@
+SocksPort 9050
+ControlPort 9051
+CookieAuthentication 1
+# SNI Spoofing entry point would be here if using Tor as a bridge
+# UseBridges 1
+# Bridge ...

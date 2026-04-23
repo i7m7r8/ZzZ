@@ -1,0 +1,6 @@
+listen_addresses = ['127.0.0.1:5353']
+server_names = ['cloudflare', 'google']
+force_tcp = true
+
+[doh]
+# SNI spoofing can be applied here by pointing to our SNI proxy
