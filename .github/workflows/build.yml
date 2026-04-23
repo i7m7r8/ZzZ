@@ -40,8 +40,6 @@ jobs:
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: zzz-core
 
       - name: Set up Android NDK
         uses: android-actions/setup-android@v3
@@ -53,17 +51,18 @@ jobs:
         run: cargo install cargo-ndk
 
       - name: Build Rust core
-        working-directory: zzz-core
         run: |
           export ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/${{ env.ANDROID_NDK_VERSION }}
-          cargo ndk --target ${{ matrix.target }} --platform ${{ matrix.platform }} build --release
+          # Build from workspace root but target zzz-core
+          cargo ndk --target ${{ matrix.target }} --platform ${{ matrix.platform }} build --release -p zzz-core
 
       - name: Copy .so to jniLibs
         run: |
           ABI=${{ matrix.abi }}
           TARGET=${{ matrix.target }}
           mkdir -p app/src/main/jniLibs/$ABI
-          cp zzz-core/target/$TARGET/release/libzzz_core.so \
+          # In a workspace, target/ is at the root
+          cp target/$TARGET/release/libzzz_core.so \
              app/src/main/jniLibs/$ABI/libzzz_core.so
 
       - name: Upload jniLibs artifact
@@ -94,34 +93,44 @@ jobs:
           ARCH=${{ matrix.arch }}
           mkdir -p app/src/main/jniLibs/$ABI
           
-          # 1. Download Tor
-          TOR_VER="0.4.8.11"
-          # Try primary URL (Guardian Project)
+          # Helper function for robust downloads
+          download_and_extract() {
+            local url=$1
+            local output=$2
+            local extract_dir=$3
+            local bin_name=$4
+            local final_name=$5
+            
+            echo "Attempting to download $bin_name from $url"
+            if curl -fL -o "$output" "$url"; then
+              mkdir -p "$extract_dir"
+              if [[ "$output" == *.zip ]]; then
+                unzip -o "$output" -d "$extract_dir"
+              else
+                tar -xzf "$output" -C "$extract_dir"
+              fi
+              find "$extract_dir" -name "$bin_name" -type f | head -1 | xargs -I{} cp -v {} "app/src/main/jniLibs/$ABI/$final_name"
+              return 0
+            else
+              echo "WARNING: Download failed for $url"
+              return 1
+            fi
+          }
+
+          # 1. Download Tor (Updated URLs)
+          TOR_VER="0.4.8.12"
           TOR_URL="https://github.com/guardianproject/tor-android/releases/download/tor-${TOR_VER}/tor-android-binary-${ARCH}.zip"
-          echo "Downloading Tor from $TOR_URL"
-          curl -L -o /tmp/tor.zip "$TOR_URL" || true
-          
-          if [ -f /tmp/tor.zip ] && unzip -t /tmp/tor.zip > /dev/null 2>&1; then
-            mkdir -p /tmp/tor_out
-            unzip -o /tmp/tor.zip -d /tmp/tor_out/
-            find /tmp/tor_out -name "tor" -type f | head -1 | xargs -I{} cp {} app/src/main/jniLibs/$ABI/libtor.so
-          else
-            echo "WARNING: Tor download failed or invalid zip, using stub"
-            printf '\x7fELF' > app/src/main/jniLibs/$ABI/libtor.so
+          if ! download_and_extract "$TOR_URL" "/tmp/tor.zip" "/tmp/tor_out" "tor" "libtor.so"; then
+             # Try fallback URL or stub
+             echo "Using stub for Tor"
+             printf '\x7fELF' > app/src/main/jniLibs/$ABI/libtor.so
           fi
 
-          # 2. Download i2pd
-          I2PD_VER="2.51.0"
+          # 2. Download i2pd (Updated version)
+          I2PD_VER="2.55.0"
           I2PD_URL="https://github.com/PurpleI2P/i2pd/releases/download/${I2PD_VER}/i2pd_${I2PD_VER}_android_${ABI}.tar.gz"
-          echo "Downloading i2pd from $I2PD_URL"
-          curl -L -o /tmp/i2pd.tar.gz "$I2PD_URL" || true
-          
-          if [ -f /tmp/i2pd.tar.gz ] && tar -tzf /tmp/i2pd.tar.gz > /dev/null 2>&1; then
-            mkdir -p /tmp/i2pd_out
-            tar -xzf /tmp/i2pd.tar.gz -C /tmp/i2pd_out/
-            find /tmp/i2pd_out -name "i2pd" -type f | head -1 | xargs -I{} cp {} app/src/main/jniLibs/$ABI/libi2pd.so
-          else
-             echo "WARNING: i2pd download failed, using stub"
+          if ! download_and_extract "$I2PD_URL" "/tmp/i2pd.tar.gz" "/tmp/i2pd_out" "i2pd" "libi2pd.so"; then
+             echo "Using stub for i2pd"
              printf '\x7fELF' > app/src/main/jniLibs/$ABI/libi2pd.so
           fi
 
@@ -133,15 +142,8 @@ jobs:
             x86_64)      DNS_ARCH="x86_64" ;;
           esac
           DNS_URL="https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/${DNS_VER}/dnscrypt-proxy-android_${DNS_ARCH}-${DNS_VER}.tar.gz"
-          echo "Downloading DNSCrypt from $DNS_URL"
-          curl -L -o /tmp/dns.tar.gz "$DNS_URL" || true
-          
-          if [ -f /tmp/dns.tar.gz ] && tar -tzf /tmp/dns.tar.gz > /dev/null 2>&1; then
-            mkdir -p /tmp/dns_out
-            tar -xzf /tmp/dns.tar.gz -C /tmp/dns_out/
-            find /tmp/dns_out -name "dnscrypt-proxy" -type f | head -1 | xargs -I{} cp {} app/src/main/jniLibs/$ABI/libdnscrypt-proxy.so
-          else
-            echo "WARNING: DNSCrypt download failed, using stub"
+          if ! download_and_extract "$DNS_URL" "/tmp/dns.tar.gz" "/tmp/dns_out" "dnscrypt-proxy" "libdnscrypt-proxy.so"; then
+            echo "Using stub for DNSCrypt"
             printf '\x7fELF' > app/src/main/jniLibs/$ABI/libdnscrypt-proxy.so
           fi
 
@@ -168,34 +170,27 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Download all jniLibs artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: jniLibs-*
-          path: jniLibs-artifacts
-
-      - name: Download all binary artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: binaries-*
-          path: binaries-artifacts
+          path: all-artifacts
 
       - name: Organize jniLibs
         run: |
           for ABI in arm64-v8a armeabi-v7a x86_64; do
             mkdir -p app/src/main/jniLibs/$ABI
             
-            # Copy from jniLibs artifact
-            if [ -d "jniLibs-artifacts/jniLibs-$ABI" ]; then
-              cp -v jniLibs-artifacts/jniLibs-$ABI/* app/src/main/jniLibs/$ABI/ || true
+            # Copy from build-rust artifact
+            if [ -d "all-artifacts/jniLibs-$ABI" ]; then
+              cp -v all-artifacts/jniLibs-$ABI/* app/src/main/jniLibs/$ABI/ || true
             fi
             
-            # Copy from binaries artifact
-            if [ -d "binaries-artifacts/binaries-$ABI" ]; then
-              cp -v binaries-artifacts/binaries-$ABI/* app/src/main/jniLibs/$ABI/ || true
+            # Copy from download-binaries artifact
+            if [ -d "all-artifacts/binaries-$ABI" ]; then
+              cp -v all-artifacts/binaries-$ABI/* app/src/main/jniLibs/$ABI/ || true
             fi
             
-            echo "Contents of jniLibs/$ABI:"
+            echo "Final contents of jniLibs/$ABI:"
             ls -la app/src/main/jniLibs/$ABI/
           done
 
@@ -245,7 +240,7 @@ jobs:
           prerelease: false
           files: release/*.apk
           body: |
-            ## ZzZ VPN - Updated Build
+            ## ZzZ VPN - Official Build
 
             **Build:** ${{ github.run_number }}
             **Commit:** ${{ github.sha }}
