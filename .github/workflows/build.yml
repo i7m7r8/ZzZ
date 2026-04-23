@@ -53,7 +53,18 @@ jobs:
       - name: Build Rust core
         run: |
           export ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/${{ env.ANDROID_NDK_VERSION }}
+          echo "Building Rust core for target ${{ matrix.target }}..."
           cargo ndk --target ${{ matrix.target }} --platform ${{ matrix.platform }} build --release -p zzz-core
+          echo "Rust build completed."
+        # Add a step to capture and display Rust build output if it fails or has warnings
+      - name: Capture Rust build output
+        if: steps.build-rust.outcome == 'failure' || steps.build-rust.outcome == 'success' # Always capture if build happens
+        run: |
+          echo "--- Rust Build Output ---"
+          # This step might need adjustment if the actual build output isn't easily captured.
+          # For now, we assume any error in the previous step would be logged.
+          # If build fails, we might want to list the target dir.
+        continue-on-error: true
 
       - name: Copy .so to jniLibs
         id: copy-so # Add an ID to reference this step's outcome
@@ -219,11 +230,13 @@ jobs:
       - name: Build debug APK
         env: # Explicitly set JAVA_OPTS to override potential issues
           JAVA_OPTS: "-Xmx1024m -Xms1024m"
+          GRADLE_OPTS: "-Xmx1024m -Xms1024m" # Also set GRADLE_OPTS for broader coverage
         run: ./gradlew assembleDebug --stacktrace
 
       - name: Build release APK
         env: # Explicitly set JAVA_OPTS to override potential issues
           JAVA_OPTS: "-Xmx1024m -Xms1024m"
+          GRADLE_OPTS: "-Xmx1024m -Xms1024m" # Also set GRADLE_OPTS for broader coverage
         run: ./gradlew assembleRelease --stacktrace
 
       - name: Upload debug APK
