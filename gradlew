@@ -117,10 +117,4 @@ if "$cygwin" || "$msys" ; then
 fi
 
 # The exec-with-gradle-home shell function
-exec "$JAVACMD" 
-    "${JAVA_OPTS}" 
-    "${GRADLE_OPTS}" 
-    "-Dorg.gradle.appname=$APP_BASE_NAME" 
-    -classpath "$CLASSPATH" 
-    org.gradle.wrapper.GradleWrapperMain 
-    "$@"
+exec "$JAVACMD" "${JAVA_OPTS}" "-Xmx2048m" "-XX:MaxMetaspaceSize=1024m" "${GRADLE_OPTS}" "-Dorg.gradle.appname=$APP_BASE_NAME" -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"

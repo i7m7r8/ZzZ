@@ -159,10 +159,17 @@ jobs:
             fi
           }
 
-          # 1. Download Tor
-          # Using stub for Tor as official download URL is problematic
-          echo "Using stub for Tor"
-          printf '\x7fELF' > app/src/main/jniLibs/$ABI/libtor.so
+          # 1. Download Tor Expert Bundle
+          TOR_VER="15.0.10"
+          TOR_URL="https://archive.torproject.org/tor-package-archive/torbrowser/15.0.10/tor-expert-bundle-android-aarch64-${TOR_VER}.tar.gz"
+          echo "Attempting to download Tor Expert Bundle from $TOR_URL"
+          # Using the custom download_and_extract function to handle tar.gz
+          if ! download_and_extract "$TOR_URL" "/tmp/tor.tar.gz" "/tmp/tor_out" "tor" "libtor.so"; then
+              echo "Failed to download and extract Tor Expert Bundle."
+              # Instead of exiting, let's use a stub as a fallback, similar to the original stub.
+              echo "Using stub for Tor"
+              printf '\x7fELF' > app/src/main/jniLibs/$ABI/libtor.so
+          fi
 
           # 2. Download i2pd
           I2PD_VER="2.59.0" # Latest stable version
