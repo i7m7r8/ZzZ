@@ -128,7 +128,13 @@ jobs:
                 unzip -o "$output" -d "$extract_dir"
               elif [[ "$output" == *.tar.gz ]] && tar -tzf "$output" > /dev/null 2>&1; then
                 mkdir -p "$extract_dir"
-                tar -xzf "$output" -C "$extract_dir"
+                echo "Extracting $output to $extract_dir..."
+                if tar -xzf "$output" -C "$extract_dir"; then
+                    echo "Extraction successful."
+                else
+                    echo "ERROR: tar extraction failed for $output. Exit code: $?"
+                    return 1 # Explicitly return failure
+                fi
               elif [[ "$output" == *.aar ]]; then # Handle AAR files specifically
                 mkdir -p "$extract_dir"
                 unzip -o "$output" -d "$extract_dir" # AARs are zip archives
@@ -244,15 +250,9 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build debug APK
-        env: # Explicitly set JAVA_OPTS and GRADLE_OPTS to override potential issues
-          JAVA_OPTS: "-Xmx1024m -Xms1024m"
-          GRADLE_OPTS: "-Xmx1024m -Xms1024m"
         run: ./gradlew assembleDebug --stacktrace
 
       - name: Build release APK
-        env: # Explicitly set JAVA_OPTS and GRADLE_OPTS to override potential issues
-          JAVA_OPTS: "-Xmx1024m -Xms1024m"
-          GRADLE_OPTS: "-Xmx1024m -Xms1024m"
         run: ./gradlew assembleRelease --stacktrace
 
       - name: Upload debug APK
