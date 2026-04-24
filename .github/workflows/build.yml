@@ -157,6 +157,8 @@ jobs:
                 return 0
               else
                 echo "WARNING: Could not find or copy binary '$bin_name' from extracted archive."
+                echo "Contents of extraction directory $extract_dir:"
+                ls -R "$extract_dir"
                 return 1
               fi
             else
